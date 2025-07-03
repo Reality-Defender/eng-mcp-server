@@ -1,0 +1,6 @@
+.ropeproject
+.ruff_cache
+__pycache__
+**.pyc
+.envrc.local
+**.sqlite

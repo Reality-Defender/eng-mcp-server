@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload File for Reality Defender Analysis</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        .upload-form { border: 2px dashed #ccc; padding: 30px; text-align: center; }
+        .file-input { margin: 20px 0; }
+        .submit-btn { background: #007cba; color: white; padding: 10px 20px; border: none; cursor: pointer; }
+        .error { color: red; margin: 10px 0; }
+        .success { color: green; margin: 10px 0; }
+        .info { background: #f0f9ff; border: 1px solid #0ea5e9; padding: 15px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>Upload File for Reality Defender Analysis</h1>
+    <div class="info">
+        <strong>File ID:</strong> <code>$file_id</code>
+    </div>
+    <div class="upload-form">
+        <form method="post" enctype="multipart/form-data" id="uploadForm">
+            <p>Select an file to upload (max $max_file_size_label)</p>
+            <div class="file-input">
+                <input type="file" name="file" accept="*" required>
+            </div>
+            <button type="submit" class="submit-btn">Upload File</button>
+        </form>
+        <div id="status"></div>
+    </div>
+    <script>
+        document.getElementById('uploadForm').onsubmit = function(e) {
+            const file = document.querySelector('input[type="file"]').files[0];
+            if (file && file.size > $max_file_size_bytes) {
+                e.preventDefault();
+                document.getElementById('status').innerHTML = '<div class="error">File too large. Maximum size is $max_file_size_label.</div>';
+                return false;
+            }
+        };
+    </script>
+</body>
+</html>

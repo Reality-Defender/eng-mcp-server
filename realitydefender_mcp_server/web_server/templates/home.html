@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Reality Defender Image Upload</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        .header { text-align: center; margin-bottom: 40px; }
+        .main-content { text-align: center; padding: 30px; border: 1px solid #ddd; border-radius: 8px; }
+        .create-btn { background: #007cba; color: white; padding: 15px 30px; border: none; 
+                      cursor: pointer; font-size: 16px; border-radius: 5px; margin: 20px 0; }
+        .create-btn:hover { background: #005a8b; }
+        .info { background: #f0f9ff; border: 1px solid #0ea5e9; padding: 15px; margin: 20px 0; }
+        .endpoints { text-align: left; margin-top: 30px; }
+        .endpoints h3 { margin-bottom: 10px; }
+        .endpoints ul { list-style-type: none; padding-left: 0; }
+        .endpoints li { margin: 5px 0; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Reality Defender Image Upload</h1>
+        <p>Upload images for deepfake detection and authenticity analysis</p>
+    </div>
+    
+    <div class="main-content">
+        <h2>Create New Upload</h2>
+        <p>Click the button below to generate a new upload session with a unique UUID.</p>
+        
+        <button class="create-btn" onclick="createUpload()">Create Upload</button>
+        
+        <div class="info">
+            <strong>How it works:</strong><br>
+            1. Click "Create Upload" to generate a unique upload URL<br>
+            2. Upload your image file for analysis<br>
+            3. Use the UUID with Reality Defender tools
+        </div>
+        
+        <div class="endpoints">
+            <h3>API Endpoints</h3>
+            <ul>
+                <li>GET / - This home page</li>
+                <li>POST /create-upload - Generate new upload UUID</li>
+                <li>GET /upload/{uuid} - Upload form</li>
+                <li>POST /upload/{uuid} - File upload</li>
+                <li>GET /health - Health check</li>
+                <li>GET /docs - OpenAPI documentation</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        async function createUpload() {
+            try {
+                const response = await fetch('/create-upload', { method: 'POST' });
+                const data = await response.json();
+                window.location.href = data.redirect_url;
+            } catch (error) {
+                alert('Failed to create upload: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
