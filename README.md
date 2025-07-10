@@ -15,25 +15,20 @@ A Model Context Protocol (MCP) server that provides AI-generated media detection
 
 ### Prerequisites
 
-- Python 3.13
-- UV or Poetry (dependency management)
+- Python 3.12
+- UV package and project manager
 - Reality Defender API Key
 
 ### Installation
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd eng-reality-defender-mcp-server
+git clone https://github.com/Reality-Defender/eng-mcp-server.git
 ```
 
 2. Install dependencies:
 ```bash
-# Using UV (recommended)
 uv sync
-
-# Or using Poetry
-poetry install
 ```
 
 3. Set up environment variables:
@@ -48,7 +43,7 @@ export REALITY_DEFENDER_API_KEY="your-api-key-here"
 To run the MCP server:
 
 ```bash
-python mcp_server.py
+uv run ./src/realitydefender_mcp_server/mcp_server.py
 ```
 
 The server will start with the web server component for file uploads on `localhost:8080`.
@@ -58,7 +53,7 @@ The server will start with the web server component for file uploads on `localho
 To run just the web server component:
 
 ```bash
-python web_server.py [options]
+uv run ./src/realitydefender_mcp_server/web_server.py [options]
 ```
 
 Web server options:
@@ -69,7 +64,7 @@ Web server options:
 
 ### MCP Client Configuration
 
-Configure the server in your MCP client. For Claude Desktop:
+Configure the server in your MCP client, e.g. for Claude Desktop:
 
 ```json
 {
@@ -164,7 +159,7 @@ uploads/
 ### Code Standards
 
 - **Type Hints**: Always use type hints for all functions and parameters
-- **Modern Python**: Use Python 3.13 features and syntax (`str | None` instead of `Optional[str]`)
+- **Modern Python**: Use Python 3.12 features and syntax (`str | None` instead of `Optional[str]`)
 - **Async First**: Prefer async/await patterns where possible
 - **Error Handling**: Return union types (`SuccessType | Error`) instead of raising exceptions
 - **Pydantic Models**: Use Pydantic for all structured data validation

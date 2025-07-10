@@ -1,32 +1,39 @@
+[build-system]
+requires = ["uv_build>=0.7.10,<0.8.0"]
+build-backend = "uv_build"
+
 [project]
 name = "realitydefender-mcp-server"
 version = "0.1.0"
 description = "MCP server for Reality Defender AI-generated media detection"
 authors = [
-    {name = "Brian Lee",email = "briandl92391@gmail.com"}
+    { name = "Reality Defender", email = "support@realitydefender.ai" }
 ]
 readme = "README.md"
-requires-python = ">=3.13,<3.14"
-dependencies = [
-    "pydantic (>=2.11.4,<3.0.0)",
-    "fastapi (>=0.115.6,<1.0.0)",
-    "uvicorn[standard] (>=0.32.1,<1.0.0)",
-    "python-multipart (>=0.0.12,<1.0.0)",
-    "mcp[cli] (>=1.9.0,<2.0.0)",
-    "realitydefender (>=0.1.1,<0.2.0)",
-    "aiohttp (>=3.10.0,<4.0.0)",
-    "aiofiles>=24.1.0,<25.0.0",
+license = "Apache-2.0"
+requires-python = ">=3.12"
+keywords = ["mcp", "deepfake"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
-
-[tool.poetry.group.dev.dependencies]
-basedpyright = "^1.29.1"
-ruff = "^0.11.10"
-pytest = "^8.3.5"
-httpx = "^0.28.1"
+dependencies = [
+    "pydantic>=2.11.4,<3.0.0",
+    "fastapi>=0.115.6,<1.0.0",
+    "uvicorn[standard]>=0.32.1,<1.0.0",
+    "python-multipart>=0.0.12,<1.0.0",
+    "mcp[cli]>=1.9.0,<2.0.0",
+    "realitydefender>=0.1.1,<0.2.0",
+    "aiohttp>=3.10.0,<4.0.0",
+    "aiofiles>=24.1.0,<25.0.0",
+    "python-dotenv>=1.0.0",
+]
 
 [dependency-groups]
 dev = [
