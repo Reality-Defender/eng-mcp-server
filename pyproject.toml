@@ -3,7 +3,7 @@ requires = ["uv_build>=0.7.10,<0.8.0"]
 build-backend = "uv_build"
 
 [project]
-name = "realitydefender-mcp-server"
+name = "reality-defender-mcp-server"
 version = "0.1.0"
 description = "MCP server for Reality Defender AI-generated media detection"
 authors = [
@@ -39,6 +39,46 @@ dependencies = [
 dev = [
     "basedpyright>=1.29.4",
     "pytest>=8.4.1",
+    "pytest-asyncio>=0.23.7,<1.0.0",
     "ruff>=0.12.1",
 ]
 
+[project.urls]
+Homepage = "https://github.com/reality-defender/eng-mcp-server"
+Repository = "https://github.com/reality-defender/eng-mcp-server"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+python_classes = "Test*"
+markers = [
+    "asyncio: mark a test as an asyncio coroutine"
+]
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+show_error_codes = true
+allow_redefinition = true
+
+[[tool.mypy.overrides]]
+module = ["fastapi.*", "mcp.*", "aiohttp.*"]
+ignore_missing_imports = true

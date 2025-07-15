@@ -22,8 +22,8 @@ from mcp.server.session import ServerSession
 from pydantic import BaseModel, Field, ValidationError
 from realitydefender import RealityDefender
 
-from realitydefender_mcp_server.config import Config, load_config, setup_logging
-from realitydefender_mcp_server.web_server.server import (
+from reality_defender_mcp_server.config import Config, load_config, setup_logging
+from reality_defender_mcp_server.web_server.server import (
     UploadMetadata,
     WebServerConfig,
     create_server,
@@ -82,7 +82,7 @@ class RealityDefenderUploadResponse(BaseModel):
 
 class RealityDefenderAnalysisResponse(BaseModel):
     status: str = Field(
-        description="Overall authenticity status (ARTIFICIAL, AUTHENTIC, ANALYZING)"
+        description="Overall authenticity status (MANIPULATED, AUTHENTIC, ANALYZING)"
     )
     score: float | None = Field(description="Confidence score (0-100)")
     models: list[RealityDefenderModel] = Field(description="Individual model results")
@@ -109,7 +109,7 @@ class RealityDefenderClientHarness:
                 error="API key not provided. REALITY_DEFENDER_API_KEY is not defined"
             )
 
-        self.client = RealityDefender({"api_key": self.api_key})
+        self.client = RealityDefender(api_key=self.api_key)
 
         return self.client
 
@@ -173,7 +173,9 @@ async def app_lifespan(_: FastMCP) -> AsyncIterator[AppContext]:
     try:
         yield AppContext(
             config=config,
-            reality_defender=RealityDefenderClientHarness(config.reality_defender_api_key),
+            reality_defender=RealityDefenderClientHarness(
+                config.reality_defender_api_key
+            ),
             web_server_url=web_server_url,
         )
     except Exception as e:
@@ -361,7 +363,7 @@ async def reality_defender_request_file_analysis(
         ctx: The server context.
 
     Returns:
-        RealityDefenderAnalysisResponse with status (ARTIFICIAL/AUTHENTIC), confidence score,
+        RealityDefenderAnalysisResponse with status (MANIPULATED/AUTHENTIC), confidence score,
         individual model results, and analysis details, or Error on failure
     """
     logger.info(
@@ -610,7 +612,7 @@ async def reality_defender_request_file_analysis(
         logger.debug("Uploading file to Reality Defender API")
 
         upload_result = RealityDefenderUploadResponse.model_validate(
-            await reality_defender.upload({"file_path": file_path})
+            await reality_defender.upload(file_path=file_path)
         )
     except ValidationError as e:
         logger.error("Reality Defender upload returned an invalid result", exc_info=e)
@@ -633,7 +635,7 @@ async def reality_defender_request_file_analysis(
             detect_result = RealityDefenderGetResultResponse.model_validate(
                 await asyncio.wait_for(
                     reality_defender.get_result(
-                        upload_result.request_id, {"max_attempts": 1}
+                        upload_result.request_id, max_attempts=1
                     ),
                     timeout=1.0,
                 )
