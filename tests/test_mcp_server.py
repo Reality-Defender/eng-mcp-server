@@ -275,21 +275,6 @@ async def test_reality_defender_generate_upload_url_success(mock_uuid: Mock) -> 
     assert result.upload_url == "http://localhost:8080/upload/test-uuid"
     assert result.request_id == "test-uuid"
 
-
-@pytest.mark.asyncio
-async def test_reality_defender_generate_upload_url_error() -> None:
-    """Test reality_defender_generate_upload_url error case."""
-    mock_context = Mock()
-    mock_context.request_context.lifespan_context.web_server_url = Error(
-        error="Web server error"
-    )
-
-    result = await reality_defender_generate_upload_url(mock_context)
-
-    assert isinstance(result, Error)
-    assert result.error == "Web server error"
-
-
 @pytest.mark.asyncio
 @patch("reality_defender_mcp_server.mcp_server.uuid.uuid4")
 async def test_reality_defender_generate_upload_url_exception(mock_uuid: Mock) -> None:

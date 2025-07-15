@@ -46,7 +46,7 @@ class RealityDefenderAnalysisRequest(BaseModel):
 
     @override
     def model_post_init(self, __context: object) -> None:
-        if not (self.file_path or self.file_url):
+        if (self.file_path and self.file_url) or not (self.file_path or self.file_url):
             raise ValueError("Exactly one of file_path or file_url must be provided")
 
 
