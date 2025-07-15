@@ -34,7 +34,7 @@ class Config(BaseModel):
     log_level: str = Field("INFO", alias="LOG_LEVEL", description="Current log level")
 
 
-def load_config(env: dict[str, str] | None = None) -> Config:
+def load_config(env: dict[str, object] | None = None) -> Config:
     env = env or dict(os.environ)
 
     return Config.model_validate(env)

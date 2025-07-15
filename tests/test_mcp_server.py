@@ -1,5 +1,4 @@
 import asyncio
-
 from typing import Any, Optional
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -49,7 +48,7 @@ def create_async_context_manager_mock(return_value: Any) -> AsyncMock:
 def test_reality_defender_analysis_request_valid_file_path() -> None:
     """Test RealityDefenderAnalysisRequest with valid file_path."""
     request = RealityDefenderAnalysisRequest(
-        file_path="/path/to/file.jpg", expected_file_type="image"
+        file_path="/path/to/file.jpg", file_url=None, expected_file_type="image"
     )
     assert request.file_path == "/path/to/file.jpg"
     assert request.file_url is None
@@ -59,7 +58,7 @@ def test_reality_defender_analysis_request_valid_file_path() -> None:
 def test_reality_defender_analysis_request_valid_file_url() -> None:
     """Test RealityDefenderAnalysisRequest with valid file_url."""
     request = RealityDefenderAnalysisRequest(
-        file_url="https://example.com/file.jpg", expected_file_type="image"
+        file_url="https://example.com/file.jpg", file_path=None, expected_file_type="image"
     )
     assert request.file_url == "https://example.com/file.jpg"
     assert request.file_path is None
@@ -83,7 +82,7 @@ def test_reality_defender_analysis_request_validation_error_no_input() -> None:
     with pytest.raises(
         ValueError, match="Exactly one of file_path or file_url must be provided"
     ):
-        RealityDefenderAnalysisRequest(expected_file_type="image")
+        RealityDefenderAnalysisRequest(file_path=None, file_url=None, expected_file_type="image")
 
 
 def test_error_model() -> None:
@@ -529,7 +528,7 @@ def test_reality_defender_analysis_request_file_types(
     file_type: str, expected_type: str
 ) -> None:
     """Test RealityDefenderAnalysisRequest with different file types."""
-    request = RealityDefenderAnalysisRequest(
+    request = RealityDefenderAnalysisRequest(  # type: ignore
         file_path="/path/to/file", expected_file_type=file_type
     )
     assert request.expected_file_type == expected_type
@@ -547,7 +546,7 @@ def test_reality_defender_analysis_response_statuses(
     status: str, score: Optional[float]
 ) -> None:
     """Test RealityDefenderAnalysisResponse with different statuses."""
-    response = RealityDefenderAnalysisResponse(status=status, score=score, models=[])
+    response = RealityDefenderAnalysisResponse(status=status, score=score, models=[])  # type: ignore
     assert response.status == status
     assert response.score == score
 

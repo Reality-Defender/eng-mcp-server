@@ -98,7 +98,7 @@ async def get_upload_form(
     request: Request,
     templates: Annotated[TemplateEngine, Depends(get_template_engine)],
     web_server_config: Annotated[WebServerConfig, Depends(get_web_server_config)],
-):
+) -> str:
     """Serve upload form."""
 
     request_id = str(uuid.uuid4())[:8]
@@ -267,7 +267,7 @@ async def upload_file(
 
 
 @app.get("/health", response_class=JSONResponse)
-async def health_check(request: Request):
+async def health_check(request: Request) -> dict[str, str]:
     """Health check endpoint."""
 
     client_ip = request.client.host if request.client else "unknown"
@@ -293,7 +293,7 @@ async def root(
 
 
 @app.post("/create-upload")
-async def create_upload(request: Request):
+async def create_upload(request: Request) -> JSONResponse:
     """Generate a new upload UUID and return redirect info."""
 
     file_id = str(uuid.uuid4())

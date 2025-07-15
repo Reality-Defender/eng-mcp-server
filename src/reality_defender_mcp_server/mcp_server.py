@@ -46,8 +46,7 @@ class RealityDefenderAnalysisRequest(BaseModel):
 
     @override
     def model_post_init(self, __context: object) -> None:
-        inputs = [self.file_path, self.file_url]
-        if sum(1 for x in inputs if x is not None) != 1:
+        if not (self.file_path or self.file_url):
             raise ValueError("Exactly one of file_path or file_url must be provided")
 
 
@@ -150,7 +149,7 @@ async def app_lifespan(_: FastMCP) -> AsyncIterator[AppContext]:
 
     web_server_url = f"http://{web_server_config.bind_address[0]}:{web_server_config.bind_address[1]}"
 
-    async def run_web_server():
+    async def run_web_server() -> None:
         try:
             web_server = create_server(web_server_config)
         except Exception:
@@ -261,8 +260,6 @@ async def reality_defender_generate_upload_url(
         to upload the image or an Error
     """
     web_server_url = ctx.request_context.lifespan_context.web_server_url
-    if isinstance(web_server_url, Error):
-        return web_server_url
 
     try:
         request_id = str(uuid.uuid4())
@@ -681,7 +678,7 @@ async def reality_defender_request_file_analysis(
 
     logger.debug(f"Parsed Reality Defender response: {detect_result.model_dump()}")
 
-    response = RealityDefenderAnalysisResponse(
+    analysis_response = RealityDefenderAnalysisResponse(
         file_id=file_id,
         status=detect_result.status,
         score=detect_result.score,
@@ -689,10 +686,10 @@ async def reality_defender_request_file_analysis(
     )
 
     logger.info(
-        f"Reality Defender analysis complete - Status: {response.status}, Score: {response.score}"
+        f"Reality Defender analysis complete - Status: {analysis_response.status}, Score: {analysis_response.score}"
     )
 
-    return response
+    return analysis_response
 
 
 if __name__ == "__main__":
