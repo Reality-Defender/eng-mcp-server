@@ -147,7 +147,11 @@ async def app_lifespan(_: FastMCP) -> AsyncIterator[AppContext]:
         upload_dir=config.web_server_uploads_dir,
     )
 
-    web_server_url = f"http://{web_server_config.bind_address[0]}:{web_server_config.bind_address[1]}"
+    match web_server_config.bind_address:
+        case ("0.0.0.0", port):
+            web_server_url = f"http://localhost:{port}"
+        case (host, port):
+            web_server_url = f"http://{host}:{port}"
 
     async def run_web_server() -> None:
         try:
