@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import asyncio
 import logging
 import mimetypes
@@ -18,20 +16,19 @@ from urllib.parse import urlparse
 import aiofiles
 import aiohttp
 from mcp.server.fastmcp import Context, FastMCP
-from mcp.server.fastmcp.prompts.base import UserMessage, Message as PromptMessage
+from mcp.server.fastmcp.prompts.base import Message as PromptMessage
+from mcp.server.fastmcp.prompts.base import UserMessage
 from mcp.server.session import ServerSession
 from pydantic import BaseModel, Field, ValidationError
 from realitydefender import RealityDefender
 
-from realitydefender_mcp_server.config import load_config, Config
-from realitydefender_mcp_server.web_server.server import UploadMetadata, WebServerConfig, create_server, find_free_port
-
-
-def ellispis(text: str, max_length: int, replacement: str = "...") -> str:
-    if len(text) < max_length:
-        return text
-    else:
-        return text[0:max_length] + " " + replacement
+from reality_defender_mcp_server.config import Config, load_config, setup_logging
+from reality_defender_mcp_server.web_server.server import (
+    UploadMetadata,
+    WebServerConfig,
+    create_server,
+    find_free_port,
+)
 
 
 class AppServerSession(ServerSession):
@@ -43,12 +40,13 @@ class RealityDefenderAnalysisRequest(BaseModel):
 
     file_path: str | None = Field(None, description="Local path to file")
     file_url: str | None = Field(None, description="URL to file to validate")
-    expected_file_type: str = Field(..., description="The type of file expected: video, image, audio or text")
+    expected_file_type: str = Field(
+        ..., description="The type of file expected: video, image, audio or text"
+    )
 
     @override
     def model_post_init(self, __context: object) -> None:
-        inputs = [self.file_path, self.file_url]
-        if sum(1 for x in inputs if x is not None) != 1:
+        if (self.file_path and self.file_url) or not (self.file_path or self.file_url):
             raise ValueError("Exactly one of file_path or file_url must be provided")
 
 
@@ -82,18 +80,23 @@ class RealityDefenderUploadResponse(BaseModel):
 
 
 class RealityDefenderAnalysisResponse(BaseModel):
-    status: str = Field(description="Overall authenticity status (ARTIFICIAL, AUTHENTIC, ANALYZING)")
+    status: str = Field(
+        description="Overall authenticity status (MANIPULATED, AUTHENTIC, ANALYZING)"
+    )
     score: float | None = Field(description="Confidence score (0-100)")
     models: list[RealityDefenderModel] = Field(description="Individual model results")
-    file_id: str | None = Field(None, description="Request ID for processed file metadata (present for URL downloads)")
+    file_id: str | None = Field(
+        None,
+        description="Request ID for processed file metadata (present for URL downloads)",
+    )
 
 
 class RealityDefenderClientHarness:
     api_key: str | None
     client: RealityDefender | None
 
-    def __init__(self, env: dict[str, str]):
-        self.api_key = env.get("REALITY_DEFENDER_API_KEY")
+    def __init__(self, reality_defender_api_key: str):
+        self.api_key = reality_defender_api_key
         self.client = None
 
     def get_client(self) -> RealityDefender | Error:
@@ -101,9 +104,11 @@ class RealityDefenderClientHarness:
             return self.client
 
         if not self.api_key:
-            return Error(error="API key not provided. REALITY_DEFENDER_API_KEY is not defined")
+            return Error(
+                error="API key not provided. REALITY_DEFENDER_API_KEY is not defined"
+            )
 
-        self.client = RealityDefender({"api_key": self.api_key})
+        self.client = RealityDefender(api_key=self.api_key)
 
         return self.client
 
@@ -121,12 +126,13 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def app_lifespan(_: FastMCP) -> AsyncIterator[AppContext]:
     config = load_config()
-
-    logger.root.setLevel(logging.DEBUG if config.debug else logging.INFO)
+    setup_logging(config.log_level)
 
     logger.info("Starting MCP server lifespan")
 
-    logger.info(f"Upload directory configured: {config.web_server_uploads_dir.absolute()}")
+    logger.info(
+        f"Upload directory configured: {config.web_server_uploads_dir.absolute()}"
+    )
 
     logger.info("Starting web server for file uploads")
 
@@ -137,16 +143,17 @@ async def app_lifespan(_: FastMCP) -> AsyncIterator[AppContext]:
         web_server_port = find_free_port()
 
     web_server_config = WebServerConfig(
-        bind_address=(web_server_host, web_server_port), upload_dir=config.web_server_uploads_dir
+        bind_address=(web_server_host, web_server_port),
+        upload_dir=config.web_server_uploads_dir,
     )
 
     match web_server_config.bind_address:
-        case ("0.0.0.0" | "127.0.0.1" | "localhost", port):
+        case ("0.0.0.0", port):
             web_server_url = f"http://localhost:{port}"
         case (host, port):
             web_server_url = f"http://{host}:{port}"
 
-    async def run_web_server():
+    async def run_web_server() -> None:
         try:
             web_server = create_server(web_server_config)
         except Exception:
@@ -155,8 +162,10 @@ async def app_lifespan(_: FastMCP) -> AsyncIterator[AppContext]:
 
         try:
             await web_server.serve()
-        except Exception as e:
-            logger.error("An unexpected error occurred", exc_info=e)
+        except asyncio.CancelledError:
+            logger.info("Task cancelled gracefully. Shutting down web server.")
+        except Exception:
+            logger.error("An unexpected error occurred!", exc_info=True)
 
     web_server_task = asyncio.create_task(run_web_server())
 
@@ -167,7 +176,9 @@ async def app_lifespan(_: FastMCP) -> AsyncIterator[AppContext]:
     try:
         yield AppContext(
             config=config,
-            reality_defender=RealityDefenderClientHarness(dict(os.environ)),
+            reality_defender=RealityDefenderClientHarness(
+                config.reality_defender_api_key
+            ),
             web_server_url=web_server_url,
         )
     except Exception as e:
@@ -176,6 +187,7 @@ async def app_lifespan(_: FastMCP) -> AsyncIterator[AppContext]:
         logger.info("MCP server lifespan ending")
 
         __ = web_server_task.cancel()
+        await web_server_task
 
 
 mcp = FastMCP(
@@ -220,7 +232,9 @@ Always follow the appropriate sequence based on user input and error conditions.
 
 
 @mcp.prompt()
-def reality_defender_request_to_check_authenticity_of_hosted_file(url: str) -> list[PromptMessage]:
+def reality_defender_request_to_check_authenticity_of_hosted_file(
+    url: str,
+) -> list[PromptMessage]:
     logger.info(f"Creating prompt to check authenticity of a file: {url}")
     return [
         UserMessage(
@@ -250,8 +264,6 @@ async def reality_defender_generate_upload_url(
         to upload the image or an Error
     """
     web_server_url = ctx.request_context.lifespan_context.web_server_url
-    if isinstance(web_server_url, Error):
-        return web_server_url
 
     try:
         request_id = str(uuid.uuid4())
@@ -283,15 +295,11 @@ async def reality_defender_get_file_info(
     file_id: str, ctx: Context[AppServerSession, AppContext]
 ) -> GetFileInfoOutput | Error:
     """
-    Get metadata about a uploaded file (user_upload) or downloaded file (direct_download).
-
-    The input to this tool, `file_id` is returned from calls to tools in steps before this
-    tool is called. It's also possible the user directly asks for information about a file
-    by `file_id`, in which case you can use this tool as well. This returns complete file
-    information including the file path needed for validation.
+    Get metadata about an uploaded file (user_upload) or downloaded file (direct_download).
 
     Args:
         file_id: The file_id to retrieve metadata for
+        ctx: The server context.
 
     Returns:
         GetFileInfoOutput object with details about the upload or an Error
@@ -310,7 +318,7 @@ async def reality_defender_get_file_info(
         return Error(error=f"No metadata file found for file_id: {file_id}")
 
     try:
-        with open(metadata_path, "r") as f:
+        with open(metadata_path) as f:
             metadata_json = f.read()
     except Exception as e:
         logger.error(f"Failed to read metadata file for file {file_id}", exc_info=e)
@@ -347,34 +355,42 @@ async def reality_defender_request_file_analysis(
     to determine if a file (text, video, image, or audio) shows signs of being AI generated.
 
     Either a file path or url is needed to invoke this tool. This might be called
-    directly with a user provided URL (direct_download flow) or this tool could be
-    called to the path to a file after the user has uploaded it and you've got the
+    directly with a user-provided URL (direct_download flow), or this tool could be
+    called to the path to a file after the user has uploaded it, and you've got the
     file path from a call to reality_defender_get_upload_info (user_upload flow).
 
     Args:
         request: RealityDefenderAnalysisRequest with information on the file
+        ctx: The server context.
 
     Returns:
-        RealityDefenderAnalysisResponse with status (ARTIFICIAL/AUTHENTIC), confidence score,
+        RealityDefenderAnalysisResponse with status (MANIPULATED/AUTHENTIC), confidence score,
         individual model results, and analysis details, or Error on failure
     """
-    logger.info(f"Starting Reality Defender image validation: {request.model_dump_json()}")
+    logger.info(
+        f"Starting Reality Defender image validation: {request.model_dump_json()}"
+    )
 
-    reality_defender_result = ctx.request_context.lifespan_context.reality_defender.get_client()
+    reality_defender_result = (
+        ctx.request_context.lifespan_context.reality_defender.get_client()
+    )
     if isinstance(reality_defender_result, Error):
-        logger.error(f"Reality Defender client not available: {reality_defender_result}")
+        logger.error(
+            f"Reality Defender client not available: {reality_defender_result}"
+        )
         return reality_defender_result
 
     reality_defender = reality_defender_result
 
-    source_url: str | None = None
     source_filename: str | None = None
 
     upload_dir = ctx.request_context.lifespan_context.config.web_server_uploads_dir
 
     if request.file_path:
         if not Path(request.file_path).is_relative_to(upload_dir):
-            return Error(error="Invalid file path provided: it must be in the filesystem of this project")
+            return Error(
+                error="Invalid file path provided: it must be in the filesystem of this project"
+            )
 
         logger.info(f"Processing local image file: {request.file_path}")
 
@@ -414,27 +430,48 @@ async def reality_defender_request_file_analysis(
                         )
 
                         if response.status != 200:
-                            response_text = ellispis(
-                                await response.text(encoding="latin-1", errors="replace"), 64, "..."
+                            response_text: str = await response.text(
+                                encoding="latin-1", errors="replace"
+                            )
+                            shortened_response_text: str = (
+                                response_text
+                                if len(str(response_text)) <= 64
+                                else f"{response_text[:64]}..."
                             )
 
-                            logger.error(f"Download failed with status code: {response.status}. {response_text}")
+                            logger.error(
+                                f"Download failed with status code: {response.status}. {shortened_response_text}"
+                            )
 
                             return Error(
                                 error=f"An non successful HTTP status code was received when downloading image: {response.status}."
                             )
 
-                        content_type = response.headers.get("content-type", "").split(";")[0].lower()
-                        if not content_type.startswith(f"{request.expected_file_type}/"):
-                            logger.error(f"URL does not return '{request.expected_file_type}' content: {content_type}")
+                        content_type = (
+                            response.headers.get("content-type", "")
+                            .split(";")[0]
+                            .lower()
+                        )
+                        if not content_type.startswith(
+                            f"{request.expected_file_type}/"
+                        ):
+                            logger.error(
+                                f"URL does not return '{request.expected_file_type}' content: {content_type}"
+                            )
 
                             return Error(
                                 error=f"Download was successful (status code: 200) but the result was not of type '{request.expected_file_type}': Content-Type is {response.headers.get('content-type')}."
                             )
 
-                        for content_disposition_key_value in response.headers.get("content-disposition", "").split(";"):
-                            if content_disposition_key_value.lower().startswith("filename="):
-                                source_filename = content_disposition_key_value.split("=", maxsplit=1)[1]
+                        for content_disposition_key_value in response.headers.get(
+                            "content-disposition", ""
+                        ).split(";"):
+                            if content_disposition_key_value.lower().startswith(
+                                "filename="
+                            ):
+                                source_filename = content_disposition_key_value.split(
+                                    "=", maxsplit=1
+                                )[1]
 
                         total_size = int(response.headers.get("content-length", 0))
                         downloaded_size = 0
@@ -452,15 +489,23 @@ async def reality_defender_request_file_analysis(
 
                                     downloaded_size += len(chunk)
 
-                                    if total_size > 0 and downloaded_size % (100 * 1024) == 0:  # Every 100KB
+                                    if (
+                                        total_size > 0
+                                        and downloaded_size % (100 * 1024) == 0
+                                    ):  # Every 100KB
                                         progress = downloaded_size / total_size * 100
                                         logger.debug(
                                             f"Download progress: {downloaded_size:,}/{total_size:,} bytes ({progress:.1f}%)"
                                         )
                         except Exception as e:
-                            logger.error(f"Download failed: {request.file_url} -> {temp_file.name}", exc_info=e)
+                            logger.error(
+                                f"Download failed: {request.file_url} -> {temp_file.name}",
+                                exc_info=e,
+                            )
 
-                            return Error(error=f"Failed to write the downloaded content to the temporary file: {e}")
+                            return Error(
+                                error=f"Failed to write the downloaded content to the temporary file: {e}"
+                            )
             except asyncio.TimeoutError:
                 logger.error(f"Download timeout after 30 seconds: {request.file_url}")
 
@@ -469,26 +514,34 @@ async def reality_defender_request_file_analysis(
             except aiohttp.ClientConnectorError as e:
                 logger.error(f"Connection error downloading image: {str(e)}")
 
-                return Error(error=f"Could not connect to the server hosting the image: {e}")
+                return Error(
+                    error=f"Could not connect to the server hosting the image: {e}"
+                )
 
             except aiohttp.ClientError as e:
                 logger.error(f"HTTP client error downloading image: {str(e)}")
 
-                return Error(error=f"An unknown error occurred while downloading the image: {e}")
+                return Error(
+                    error=f"An unknown error occurred while downloading the image: {e}"
+                )
 
             download_duration = time.time() - download_start
-            download_speed = downloaded_size / download_duration if download_duration > 0 else 0
+            download_speed = (
+                downloaded_size / download_duration if download_duration > 0 else 0
+            )
             logger.info(
                 f"Download completed: {downloaded_size:,} bytes in {download_duration:.2f}s ({download_speed / 1024:.1f} KB/s)"
             )
 
             # Create upload metadata for the downloaded file
             file_id = str(uuid.uuid4())
-            upload_dir = ctx.request_context.lifespan_context.config.web_server_uploads_dir
+            upload_dir = (
+                ctx.request_context.lifespan_context.config.web_server_uploads_dir
+            )
             file_dir = upload_dir / file_id
             file_dir.mkdir(parents=True, exist_ok=True)
 
-            # Determine file extension from content type or URL
+            # Determine file extension from a content type or URL
             file_ext = mimetypes.guess_extension(content_type)
             if file_ext is None:
                 guessed_type, _ = mimetypes.guess_type(parsed_url.path)
@@ -496,7 +549,9 @@ async def reality_defender_request_file_analysis(
                     file_ext = mimetypes.guess_extension(guessed_type)
 
             if not file_ext:
-                logger.error(f"Unable to resolve file extension from the downloaded file: {content_type} [{file_id=}]")
+                logger.error(
+                    f"Unable to resolve file extension from the downloaded file: {content_type} [{file_id=}]"
+                )
 
                 return Error(
                     error=f"Invalid/Unsupported file: Content-Type is '{content_type}'. File extension resolution failed."
@@ -510,7 +565,9 @@ async def reality_defender_request_file_analysis(
                         async for chunk in src:
                             _ = await dst.write(chunk)
             except Exception as e:
-                logger.error(f"Copy file failed: {temp_file.name} -> {file_path}", exc_info=e)
+                logger.error(
+                    f"Copy file failed: {temp_file.name} -> {file_path}", exc_info=e
+                )
 
                 return Error(error=f"Writing final file unexpectedly failed: {e}")
 
@@ -533,12 +590,16 @@ async def reality_defender_request_file_analysis(
                 async with aiofiles.open(metadata_path, "w") as f:
                     _ = await f.write(metadata.model_dump_json())
             except Exception as e:
-                logger.error(f"Writing metadata failed: {metadata_path}. {metadata}", exc_info=e)
+                logger.error(
+                    f"Writing metadata failed: {metadata_path}. {metadata}", exc_info=e
+                )
 
                 return Error(error=f"Writing file metadata unexpectedly failed: {e}")
 
             total_duration = time.time() - download_start_time
-            logger.info(f"Image download and metadata creation completed in {total_duration:.2f}s [{file_id=}]")
+            logger.info(
+                f"Image download and metadata creation completed in {total_duration:.2f}s [{file_id=}]"
+            )
     else:
         return Error(error="Invalid request: file_path and file_url are both absent")
 
@@ -552,11 +613,13 @@ async def reality_defender_request_file_analysis(
         logger.debug("Uploading file to Reality Defender API")
 
         upload_result = RealityDefenderUploadResponse.model_validate(
-            await reality_defender.upload({"file_path": file_path})
+            await reality_defender.upload(file_path=file_path)
         )
     except ValidationError as e:
         logger.error("Reality Defender upload returned an invalid result", exc_info=e)
-        return Error(error=f"Failed to parse upload file result from Reality Defender: {str(e)}")
+        return Error(
+            error=f"Failed to parse upload file result from Reality Defender: {str(e)}"
+        )
     except Exception as e:
         logger.error("Reality Defender upload failed", exc_info=e)
         return Error(error=f"Failed to upload file to Reality Defender: {str(e)}")
@@ -572,17 +635,30 @@ async def reality_defender_request_file_analysis(
         try:
             detect_result = RealityDefenderGetResultResponse.model_validate(
                 await asyncio.wait_for(
-                    reality_defender.get_result(upload_result.request_id, {"max_attempts": 1}), timeout=1.0
+                    reality_defender.get_result(
+                        upload_result.request_id, max_attempts=1
+                    ),
+                    timeout=1.0,
                 )
             )
         except ValidationError as e:
-            logger.error("Reality Defender detection result returned an invalid result", exc_info=e)
-            return Error(error=f"Failed to parse detection result from Reality Defender: {str(e)}")
+            logger.error(
+                "Reality Defender detection result returned an invalid result",
+                exc_info=e,
+            )
+            return Error(
+                error=f"Failed to parse detection result from Reality Defender: {str(e)}"
+            )
         except asyncio.TimeoutError:
             pass
         except Exception as e:
-            logger.error("Reality Defender detection result returned an invalid result", exc_info=e)
-            return Error(error=f"Failed to parse detection result from Reality Defender: {str(e)}")
+            logger.error(
+                "Reality Defender detection result returned an invalid result",
+                exc_info=e,
+            )
+            return Error(
+                error=f"Failed to parse detection result from Reality Defender: {str(e)}"
+            )
         else:
             if detect_result.status != "ANALYZING":
                 break
@@ -606,16 +682,18 @@ async def reality_defender_request_file_analysis(
 
     logger.debug(f"Parsed Reality Defender response: {detect_result.model_dump()}")
 
-    response = RealityDefenderAnalysisResponse(
+    analysis_response = RealityDefenderAnalysisResponse(
         file_id=file_id,
         status=detect_result.status,
         score=detect_result.score,
         models=detect_result.models,
     )
 
-    logger.info(f"Reality Defender analysis complete - Status: {response.status}, Score: {response.score}")
+    logger.info(
+        f"Reality Defender analysis complete - Status: {analysis_response.status}, Score: {analysis_response.score}"
+    )
 
-    return response
+    return analysis_response
 
 
 if __name__ == "__main__":

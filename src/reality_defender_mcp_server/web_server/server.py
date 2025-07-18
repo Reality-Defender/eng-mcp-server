@@ -20,9 +20,6 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 
-templates_dir = Path(__file__).parent.joinpath("templates")
-
-
 def pretty_size(size_bytes: int) -> str:
     for mag, unit in ((3, "GB"), (2, "MB"), (1, "KB")):
         byte_count = math.pow(1024, mag)
@@ -59,10 +56,9 @@ class WebServerConfig(BaseModel):
 logger = logging.getLogger(__name__)
 
 
-app = FastAPI(
+app: FastAPI = FastAPI(
     title="Reality Defender Image Upload",
     description="Web interface for uploading images for Reality Defender analysis",
-    version="1.0.0",
 )
 
 
@@ -102,12 +98,14 @@ async def get_upload_form(
     request: Request,
     templates: Annotated[TemplateEngine, Depends(get_template_engine)],
     web_server_config: Annotated[WebServerConfig, Depends(get_web_server_config)],
-):
+) -> str:
     """Serve upload form."""
 
     request_id = str(uuid.uuid4())[:8]
     client_ip = request.client.host if request.client else "unknown"
-    logger.info(f"Serving upload form for UUID: {file_id} [request_id: {request_id}, client_ip: {client_ip}]")
+    logger.info(
+        f"Serving upload form for UUID: {file_id} [request_id: {request_id}, client_ip: {client_ip}]"
+    )
     logger.debug(
         f"Upload form requested - UUID: {file_id}, User-Agent: {request.headers.get('user-agent', 'unknown')} [request_id: {request_id}]"
     )
@@ -140,21 +138,29 @@ async def upload_file(
         f"Upload request received - UUID: {file_id}, Content-Type: {file.content_type}, User-Agent: {request.headers.get('user-agent', 'unknown') if request else 'unknown'} [request_id: {request_id}]"
     )
     upload_start_time = time.time()
-    logger.info(f"Starting file upload processing for UUID: {file_id} [request_id: {request_id}]")
+    logger.info(
+        f"Starting file upload processing for UUID: {file_id} [request_id: {request_id}]"
+    )
 
     # Validate UUID format
     try:
         _ = uuid.UUID(file_id)
-        logger.debug(f"UUID validation passed for: {file_id} [request_id: {request_id}]")
+        logger.debug(
+            f"UUID validation passed for: {file_id} [request_id: {request_id}]"
+        )
     except ValueError:
         logger.error(f"Invalid UUID format: {file_id} [request_id: {request_id}]")
         raise HTTPException(status_code=400, detail="Invalid UUID")
 
     if not file.filename:
-        logger.error(f"No filename provided in upload for UUID: {file_id} [request_id: {request_id}]")
+        logger.error(
+            f"No filename provided in upload for UUID: {file_id} [request_id: {request_id}]"
+        )
         raise HTTPException(status_code=400, detail="No file uploaded")
 
-    logger.debug(f"Processing file: {file.filename}, Content-Type: {file.content_type} [request_id: {request_id}]")
+    logger.debug(
+        f"Processing file: {file.filename}, Content-Type: {file.content_type} [request_id: {request_id}]"
+    )
 
     # Check file size
     content_read_start = time.time()
@@ -170,14 +176,17 @@ async def upload_file(
             f"File too large: {file_size:,} bytes > {web_server_config.max_file_size:,} bytes for UUID: {file_id} [request_id: {request_id}]"
         )
         raise HTTPException(
-            status_code=413, detail=f"File too large. Maximum size is {web_server_config.max_file_size // 1024}KB."
+            status_code=413,
+            detail=f"File too large. Maximum size is {web_server_config.max_file_size // 1024}KB.",
         )
 
     # Validate file extension
     file_ext = Path(file.filename).suffix.lower()
     logger.debug(f"File extension: {file_ext} [request_id: {request_id}]")
     if file_ext not in web_server_config.allowed_extensions:
-        logger.error(f"Invalid file extension: {file_ext} for UUID: {file_id} [request_id: {request_id}]")
+        logger.error(
+            f"Invalid file extension: {file_ext} for UUID: {file_id} [request_id: {request_id}]"
+        )
         raise HTTPException(
             status_code=400,
             detail=f"Invalid file type. Allowed: {', '.join(sorted(web_server_config.allowed_extensions))}",
@@ -185,12 +194,18 @@ async def upload_file(
 
     # Create upload directory
     upload_uuid_dir = web_server_config.upload_dir / file_id
-    logger.debug(f"Creating upload directory: {upload_uuid_dir} [request_id: {request_id}]")
+    logger.debug(
+        f"Creating upload directory: {upload_uuid_dir} [request_id: {request_id}]"
+    )
     try:
         upload_uuid_dir.mkdir(parents=True, exist_ok=True)
     except Exception as e:
-        logger.error(f"Failed to create upload directory: {str(e)} [request_id: {request_id}]")
-        raise HTTPException(status_code=500, detail=f"Failed to create upload directory: {str(e)}")
+        logger.error(
+            f"Failed to create upload directory: {str(e)} [request_id: {request_id}]"
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create upload directory: {str(e)}"
+        )
 
     # Save file data to blob with extension
     blob_path = upload_uuid_dir / f"blob{file_ext}"
@@ -202,8 +217,12 @@ async def upload_file(
             _ = f.write(content)
         file_write_duration = time.time() - file_write_start
     except Exception as e:
-        logger.error(f"Failed to create upload directory: {str(e)} [request_id: {request_id}]")
-        raise HTTPException(status_code=500, detail=f"Failed to create upload directory: {str(e)}")
+        logger.error(
+            f"Failed to create upload directory: {str(e)} [request_id: {request_id}]"
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create upload directory: {str(e)}"
+        )
 
     # Create metadata
     metadata = UploadMetadata(
@@ -224,8 +243,12 @@ async def upload_file(
             json.dump(metadata.model_dump(), f, indent=2)
 
     except Exception as e:
-        logger.error(f"Failed to create upload directory: {str(e)} [request_id: {request_id}]")
-        raise HTTPException(status_code=500, detail=f"Failed to create upload directory: {str(e)}")
+        logger.error(
+            f"Failed to create upload directory: {str(e)} [request_id: {request_id}]"
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create upload directory: {str(e)}"
+        )
 
     total_duration = time.time() - upload_start_time
     write_speed = file_size / file_write_duration if file_write_duration > 0 else 0
@@ -244,7 +267,7 @@ async def upload_file(
 
 
 @app.get("/health", response_class=JSONResponse)
-async def health_check(request: Request):
+async def health_check(request: Request) -> dict[str, str]:
     """Health check endpoint."""
 
     client_ip = request.client.host if request.client else "unknown"
@@ -258,7 +281,9 @@ async def health_check(request: Request):
 
 
 @app.get("/", response_class=HTMLResponse)
-async def root(request: Request, templates: Annotated[TemplateEngine, Depends(get_template_engine)]) -> str:
+async def root(
+    request: Request, templates: Annotated[TemplateEngine, Depends(get_template_engine)]
+) -> str:
     """Home page with upload creation."""
 
     client_ip = request.client.host if request.client else "unknown"
@@ -268,8 +293,8 @@ async def root(request: Request, templates: Annotated[TemplateEngine, Depends(ge
 
 
 @app.post("/create-upload")
-async def create_upload(request: Request):
-    """Generate new upload UUID and return redirect info."""
+async def create_upload(request: Request) -> JSONResponse:
+    """Generate a new upload UUID and return redirect info."""
 
     file_id = str(uuid.uuid4())
     client_ip = request.client.host if request.client else "unknown"
@@ -289,7 +314,8 @@ def find_free_port() -> int:
 
 def create_server(web_server_config: WebServerConfig) -> uvicorn.Server:
     """Run FastAPI web server synchronously (blocking)."""
-    template_engine = TemplateEngine(templates_dir)
+    templates_dir: Path = Path(__file__).parent.joinpath("templates")
+    template_engine: TemplateEngine = TemplateEngine(templates_dir)
 
     app.dependency_overrides[get_web_server_config] = lambda: web_server_config
     app.dependency_overrides[get_template_engine] = lambda: template_engine
@@ -298,4 +324,6 @@ def create_server(web_server_config: WebServerConfig) -> uvicorn.Server:
 
     logger.info(f"Starting web server on {host}:{port}")
 
-    return uvicorn.Server(uvicorn.Config(app, host=host, port=port, log_config=None, access_log=False))
+    return uvicorn.Server(
+        uvicorn.Config(app, host=host, port=port, log_config=None, access_log=False)
+    )

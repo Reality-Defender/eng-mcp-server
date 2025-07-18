@@ -18,9 +18,9 @@ This document outlines key information for working with the Reality Defender MCP
 - **Output Serialization**: Use model_dump() for all data sent to external systems
 - **Type Annotations**: Ensure all function parameters and return values have proper type annotations
 
-### Python 3.13 Standards & Best Practices
+### Python 3.12 Standards & Best Practices
 
-- **Modern Type Annotations**: Use Python 3.13 union syntax (`str | None` instead of `Optional[str]`)
+- **Modern Type Annotations**: Use Python 3.12 union syntax (`str | None` instead of `Optional[str]`)
 - **Strict Type Hints**: Apply type hints to all functions, parameters, and return values
 - **Prefer `object` over `Any`**: Use `object` instead of `Any` for better type safety (similar to TypeScript's `unknown` over `any`)
 - **Type Parameter Syntax**: Use the new `Class[T]` type parameter syntax for generics
@@ -177,7 +177,7 @@ uploads/
 - Uses `aiohttp` for async HTTP requests and `aiofiles` for file operations
 - FastAPI web framework for HTTP upload handling with testable architecture
 - Proper MIME type and file extension validation
-- Modern Python 3.13 union syntax throughout
+- Modern Python 3.12 union syntax throughout
 - Structured as a proper package with CLI interface
 - Enhanced logging with request IDs, timing, and detailed error context
 - URL downloads create upload metadata for transparency and subsequent retrieval
@@ -202,8 +202,8 @@ Server options:
 ### Development Setup
 
 Prerequisites:
-- Python 3.13
-- Poetry (dependency management)
+- Python 3.12
+- UV (dependency management)
 
 Setup steps:
 1. Clone the repository
