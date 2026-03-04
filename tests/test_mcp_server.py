@@ -16,6 +16,7 @@ from reality_defender_mcp_server.mcp_server import (
     RealityDefenderGetResultResponse,
     RealityDefenderModel,
     RealityDefenderUploadResponse,
+    get_request_api_key,
     reality_defender_generate_upload_url,
     reality_defender_get_file_info,
     reality_defender_request_file_analysis,
@@ -617,3 +618,35 @@ def test_reality_defender_client_harness_none_api_key() -> None:
 
     assert isinstance(result, Error)
     assert "API key not provided" in result.error
+
+
+@patch("reality_defender_mcp_server.mcp_server.RealityDefender")
+def test_reality_defender_client_harness_get_client_with_override(
+    mock_reality_defender: Mock,
+) -> None:
+    """Test RealityDefenderClientHarness get_client uses override key when provided."""
+    harness = RealityDefenderClientHarness("default-api-key")
+
+    _ = harness.get_client(api_key_override="override-api-key")
+
+    mock_reality_defender.assert_called_once_with(api_key="override-api-key")
+
+
+def test_get_request_api_key_from_header() -> None:
+    """Test get_request_api_key returns x-api-key header when present."""
+    mock_context = Mock()
+    mock_context.request_context.request.headers.get.return_value = "header-key"
+
+    result = get_request_api_key(mock_context)
+
+    assert result == "header-key"
+
+
+def test_get_request_api_key_returns_none_without_request() -> None:
+    """Test get_request_api_key returns None when request context has no request."""
+    mock_context = Mock()
+    mock_context.request_context.request = None
+
+    result = get_request_api_key(mock_context)
+
+    assert result is None

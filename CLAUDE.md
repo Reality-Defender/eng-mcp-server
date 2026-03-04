@@ -80,6 +80,13 @@ The application uses environment variables for configuration:
 | `WEB_SERVER_PORT` | Port for the web server (default: 8080) | No |
 | `WEB_SERVER_UPLOADS_DIR` | Directory for file uploads (default: ./uploads) | No |
 
+## Authentication Notes
+
+- Default authentication to Reality Defender uses `REALITY_DEFENDER_API_KEY` from environment variables.
+- For cloud-hosted multi-tenant scenarios, callers can provide a request-scoped key with the `X-Api-Key` header.
+- Header-based keys override the environment key for that request.
+- Never pass API keys through URL query parameters.
+
 ## Key Components
 
 ### Reality Defender Integration

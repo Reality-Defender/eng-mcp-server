@@ -99,16 +99,21 @@ class RealityDefenderClientHarness:
         self.api_key = reality_defender_api_key
         self.client = None
 
-    def get_client(self) -> RealityDefender | Error:
+    def get_client(self, api_key_override: str | None = None) -> RealityDefender | Error:
+        resolved_api_key = api_key_override.strip() if api_key_override else self.api_key
+
+        if not resolved_api_key:
+            return Error(
+                error="API key not provided. Set REALITY_DEFENDER_API_KEY or pass X-Api-Key header."
+            )
+
+        if api_key_override:
+            return RealityDefender(api_key=resolved_api_key)
+
         if self.client:
             return self.client
 
-        if not self.api_key:
-            return Error(
-                error="API key not provided. REALITY_DEFENDER_API_KEY is not defined"
-            )
-
-        self.client = RealityDefender(api_key=self.api_key)
+        self.client = RealityDefender(api_key=resolved_api_key)
 
         return self.client
 
@@ -118,6 +123,24 @@ class AppContext:
     config: Config
     reality_defender: RealityDefenderClientHarness
     web_server_url: str
+
+
+def get_request_api_key(
+    ctx: Context[AppServerSession, AppContext],
+) -> str | None:
+    request = ctx.request_context.request
+    if request is None:
+        return None
+
+    headers = getattr(request, "headers", None)
+    if headers is None:
+        return None
+
+    api_key = headers.get("x-api-key")
+    if api_key:
+        api_key = api_key.strip()
+
+    return api_key if api_key else None
 
 
 logger = logging.getLogger(__name__)
@@ -371,8 +394,12 @@ async def reality_defender_request_file_analysis(
         f"Starting Reality Defender image validation: {request.model_dump_json()}"
     )
 
-    reality_defender_result = (
-        ctx.request_context.lifespan_context.reality_defender.get_client()
+    request_api_key = get_request_api_key(ctx)
+    if request_api_key:
+        logger.info("Using request-scoped Reality Defender API key from X-Api-Key header")
+
+    reality_defender_result = ctx.request_context.lifespan_context.reality_defender.get_client(
+        api_key_override=request_api_key
     )
     if isinstance(reality_defender_result, Error):
         logger.error(

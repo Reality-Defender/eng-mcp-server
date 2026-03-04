@@ -99,6 +99,13 @@ The application uses environment variables for configuration:
 | `WEB_SERVER_PORT` | Port for the web server | No | 8080 |
 | `WEB_SERVER_UPLOADS_DIR` | Directory for file uploads | No | ./uploads |
 
+### API Key Authentication
+
+- By default, the server uses `REALITY_DEFENDER_API_KEY` from environment variables.
+- For cloud deployments, clients can pass a request-scoped Reality Defender key using the `X-Api-Key` HTTP header.
+- If `X-Api-Key` is present, it is used for that request and takes precedence over `REALITY_DEFENDER_API_KEY`.
+- For security, prefer headers over URL query parameters for API keys.
+
 ## MCP Tools
 
 The server provides the following MCP tools:
