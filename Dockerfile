@@ -8,4 +8,4 @@ WORKDIR /app
 RUN uv sync --locked
 
 # Run the application
-CMD ["uv", "run", "./src/realitydefender_mcp_server/mcp_server.py"]
+CMD ["uv", "run", "./src/reality_defender_mcp_server/mcp_server.py", "--transport", "streamable-http"]
