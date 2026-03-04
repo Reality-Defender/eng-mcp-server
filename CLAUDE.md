@@ -67,6 +67,7 @@ All URL errors suggest using the upload workflow as an alternative with specific
 
 - **Git Commands**: Use `git log --patch` for combined log and diff viewing
 - **Lock Files**: Never edit lock files directly - ask for updates after adding dependencies
+- **Container CI**: On `main`, GitHub Actions builds and publishes a Docker image to GHCR (`ghcr.io/<owner>/eng-mcp-server`) with `latest`, `main`, and `sha-<commit>` tags
 
 ## Configuration
 
@@ -196,15 +197,24 @@ uploads/
 To run the application in server mode:
 
 ```bash
-python server.py [options]
+uv run ./src/reality_defender_mcp_server/mcp_server.py [--transport stdio|streamable-http]
 ```
 
+### Streamable HTTP Mode (Cloud)
+
+Run MCP with Streamable HTTP transport:
+
+```bash
+FASTMCP_HOST=0.0.0.0 FASTMCP_PORT=8000 uv run ./src/reality_defender_mcp_server/mcp_server.py --transport streamable-http
+```
+
+- Default Streamable HTTP MCP endpoint path is `/mcp`
+- Keep using `X-Api-Key` header for request-scoped Reality Defender API keys
+
 Server options:
-- `--debug`: Enable debug logging
-- `--host`: Server host (default: 127.0.0.1)
-- `--port`: Server port (default: 8000)
-- `--polling-interval`: Polling interval in seconds (default: 5)
-- `--max-messages-per-poll`: Max number of messages to fetch per poll (default: 100)
+- `--transport`: Transport mode (`stdio` or `streamable-http`)
+- `FASTMCP_HOST`: Host bind address for HTTP transports (default: `127.0.0.1`)
+- `FASTMCP_PORT`: Port for HTTP transports (default: `8000`)
 
 ### Development Setup
 
@@ -214,9 +224,9 @@ Prerequisites:
 
 Setup steps:
 1. Clone the repository
-2. Run `poetry install` to install dependencies
+2. Run `uv sync` to install dependencies
 3. Set up the required environment variables
-4. Run the server with `poetry run python server.py`
+4. Run the server with `uv run ./src/reality_defender_mcp_server/mcp_server.py`
 
 ## Common Tasks
 
@@ -234,16 +244,16 @@ Run the following commands:
 
 ```bash
 # Run type checking
-poetry run pyright
+uv run basedpyright
 
 # Run linting
-poetry run ruff check . 
+uv run ruff check . 
 ```
 
 ### Running Tests
 
 ```bash
-poetry run pytest
+uv run pytest
 ```
 
 ## Troubleshooting

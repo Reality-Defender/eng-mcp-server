@@ -43,17 +43,25 @@ export REALITY_DEFENDER_API_KEY="your-api-key-here"
 To run the MCP server:
 
 ```bash
-uv run ./src/realitydefender_mcp_server/mcp_server.py
+uv run ./src/reality_defender_mcp_server/mcp_server.py
 ```
 
 The server will start with the web server component for file uploads on `localhost:8080`.
+
+To run MCP over Streamable HTTP (cloud-friendly):
+
+```bash
+FASTMCP_HOST=0.0.0.0 FASTMCP_PORT=8000 uv run ./src/reality_defender_mcp_server/mcp_server.py --transport streamable-http
+```
+
+By default, the Streamable HTTP MCP endpoint is served at `/mcp`.
 
 #### Standalone Web Server
 
 To run just the web server component:
 
 ```bash
-uv run ./src/realitydefender_mcp_server/web_server.py [options]
+uv run ./src/reality_defender_mcp_server/web_server.py [options]
 ```
 
 Web server options:
@@ -133,6 +141,19 @@ Analyzes a file for AI generation using Reality Defender API.
 - `request` (RealityDefenderAnalysisRequest): Analysis request with file path/URL and expected file type
 
 **Returns:** `RealityDefenderAnalysisResponse | Error`
+
+## Streamable HTTP Deployment
+
+- Use `--transport streamable-http` to expose MCP over HTTP for cloud deployments.
+- Configure bind host/port with `FASTMCP_HOST` and `FASTMCP_PORT`.
+- Default MCP path is `/mcp` (configurable via FastMCP settings environment variables).
+- Continue using `X-Api-Key` to pass request-scoped Reality Defender credentials.
+
+## Container Publishing
+
+- On pushes to `main`, GitHub Actions builds the Docker image from `Dockerfile`.
+- The image is published to GitHub Container Registry as `ghcr.io/<owner>/eng-mcp-server`.
+- Published tags include `latest`, `main`, and `sha-<commit>`.
 
 ## Usage Workflows
 

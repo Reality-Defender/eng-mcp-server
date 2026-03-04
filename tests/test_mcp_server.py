@@ -17,6 +17,8 @@ from reality_defender_mcp_server.mcp_server import (
     RealityDefenderModel,
     RealityDefenderUploadResponse,
     get_request_api_key,
+    main,
+    mcp,
     reality_defender_generate_upload_url,
     reality_defender_get_file_info,
     reality_defender_request_file_analysis,
@@ -650,3 +652,21 @@ def test_get_request_api_key_returns_none_without_request() -> None:
     result = get_request_api_key(mock_context)
 
     assert result is None
+
+
+@patch.object(mcp, "run")
+@patch("sys.argv", ["mcp_server.py"])
+def test_main_uses_stdio_transport_by_default(mock_run: Mock) -> None:
+    """Test CLI defaults to stdio transport."""
+    main()
+
+    mock_run.assert_called_once_with(transport="stdio")
+
+
+@patch.object(mcp, "run")
+@patch("sys.argv", ["mcp_server.py", "--transport", "streamable-http"])
+def test_main_uses_streamable_http_transport(mock_run: Mock) -> None:
+    """Test CLI supports streamable-http transport."""
+    main()
+
+    mock_run.assert_called_once_with(transport="streamable-http")

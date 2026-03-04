@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import logging
 import mimetypes
@@ -723,5 +724,19 @@ async def reality_defender_request_file_analysis(
     return analysis_response
 
 
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Reality Defender MCP Server")
+    parser.add_argument(
+        "--transport",
+        choices=("stdio", "streamable-http"),
+        default="stdio",
+        help="MCP transport (default: stdio)",
+    )
+
+    args = parser.parse_args()
+
+    mcp.run(transport=args.transport)
+
+
 if __name__ == "__main__":
-    mcp.run()
+    main()
