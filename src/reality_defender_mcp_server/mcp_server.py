@@ -214,6 +214,17 @@ async def app_lifespan(_: FastMCP) -> AsyncIterator[AppContext]:
         await web_server_task
 
 
+# Configure FastMCP host/port and paths from environment, with sensible defaults
+_MCP_HOST = os.environ.get("MCP_HOST", "127.0.0.1")
+try:
+    _MCP_PORT = int(os.environ.get("MCP_PORT", "8000"))
+except ValueError:
+    _MCP_PORT = 8000
+
+_MCP_MOUNT_PATH = os.environ.get("MCP_MOUNT_PATH", "/")
+_MCP_STREAMABLE_HTTP_PATH = os.environ.get("MCP_STREAMABLE_HTTP_PATH", "/mcp")
+
+
 mcp = FastMCP(
     "realitydefender",
     lifespan=app_lifespan,
@@ -252,6 +263,10 @@ For ANY error returned by a tool:
 
 Always follow the appropriate sequence based on user input and error conditions.
 """,
+    host=_MCP_HOST,
+    port=_MCP_PORT,
+    mount_path=_MCP_MOUNT_PATH,
+    streamable_http_path=_MCP_STREAMABLE_HTTP_PATH,
 )
 
 
