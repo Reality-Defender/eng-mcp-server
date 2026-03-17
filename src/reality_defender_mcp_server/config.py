@@ -31,6 +31,13 @@ class Config(BaseModel):
         alias="WEB_SERVER_UPLOADS_DIR",
         description="The path to store files that are uploaded to the web server",
     )
+    uploads_enabled: bool = Field(
+        True,
+        alias="UPLOADS",
+        description=(
+            "Enable local file upload workflow. Set to 'false' to disable uploads and allow only remote URLs."
+        ),
+    )
     log_level: str = Field("INFO", alias="LOG_LEVEL", description="Current log level")
 
 

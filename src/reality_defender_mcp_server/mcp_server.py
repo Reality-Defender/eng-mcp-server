@@ -123,7 +123,7 @@ class RealityDefenderClientHarness:
 class AppContext:
     config: Config
     reality_defender: RealityDefenderClientHarness
-    web_server_url: str
+    web_server_url: str | None
 
 
 def get_request_api_key(
@@ -158,42 +158,50 @@ async def app_lifespan(_: FastMCP) -> AsyncIterator[AppContext]:
         f"Upload directory configured: {config.web_server_uploads_dir.absolute()}"
     )
 
-    logger.info("Starting web server for file uploads")
+    web_server_task: asyncio.Task[None] | None = None
+    web_server_url: str | None = None
 
-    web_server_host = config.web_server_host
-    web_server_port = config.web_server_port
+    if config.uploads_enabled:
+        logger.info("Starting web server for file uploads")
 
-    if web_server_port == 0:
-        web_server_port = find_free_port()
+        web_server_host = config.web_server_host
+        web_server_port = config.web_server_port
 
-    web_server_config = WebServerConfig(
-        bind_address=(web_server_host, web_server_port),
-        upload_dir=config.web_server_uploads_dir,
-    )
+        if web_server_port == 0:
+            web_server_port = find_free_port()
 
-    match web_server_config.bind_address:
-        case ("0.0.0.0", port):
-            web_server_url = f"http://localhost:{port}"
-        case (host, port):
-            web_server_url = f"http://{host}:{port}"
+        web_server_config = WebServerConfig(
+            bind_address=(web_server_host, web_server_port),
+            upload_dir=config.web_server_uploads_dir,
+        )
 
-    async def run_web_server() -> None:
-        try:
-            web_server = create_server(web_server_config)
-        except Exception:
-            logger.exception("Create server failed")
-            raise
+        match web_server_config.bind_address:
+            case ("0.0.0.0", port):
+                web_server_url = f"http://localhost:{port}"
+            case (host, port):
+                web_server_url = f"http://{host}:{port}"
 
-        try:
-            await web_server.serve()
-        except asyncio.CancelledError:
-            logger.info("Task cancelled gracefully. Shutting down web server.")
-        except Exception:
-            logger.error("An unexpected error occurred!", exc_info=True)
+        async def run_web_server() -> None:
+            try:
+                web_server = create_server(web_server_config)
+            except Exception:
+                logger.exception("Create server failed")
+                raise
 
-    web_server_task = asyncio.create_task(run_web_server())
+            try:
+                await web_server.serve()
+            except asyncio.CancelledError:
+                logger.info("Task cancelled gracefully. Shutting down web server.")
+            except Exception:
+                logger.error("An unexpected error occurred!", exc_info=True)
 
-    logger.info(f"Web server started at {web_server_url}")
+        web_server_task = asyncio.create_task(run_web_server())
+
+        logger.info(f"Web server started at {web_server_url}")
+    else:
+        logger.info(
+            "Uploads are disabled by configuration (UPLOADS=false). Web server not started."
+        )
 
     logger.info("MCP server initialization complete")
 
@@ -210,8 +218,9 @@ async def app_lifespan(_: FastMCP) -> AsyncIterator[AppContext]:
     finally:
         logger.info("MCP server lifespan ending")
 
-        __ = web_server_task.cancel()
-        await web_server_task
+        if web_server_task is not None:
+            __ = web_server_task.cancel()
+            await web_server_task
 
 
 # Configure FastMCP host/port and paths from environment, with sensible defaults
@@ -225,44 +234,65 @@ _MCP_MOUNT_PATH = os.environ.get("MCP_MOUNT_PATH", "/")
 _MCP_STREAMABLE_HTTP_PATH = os.environ.get("MCP_STREAMABLE_HTTP_PATH", "/mcp")
 
 
+def _build_instructions(uploads_enabled: bool) -> str:
+    if uploads_enabled:
+        return (
+            "# Reality Defender: MCP Server\n\n"
+            "## Detecting AI generated media\n"
+            "For file analysis via Reality Defender, there are two flows: user uploaded and direct download.\n\n"
+            "### user_upload\n"
+            "A user indicates they have a file they would like to upload for analysis themselves. They might \n"
+            "have been sent a file or have already downloaded it from a web site. In this case, the user will need to be\n"
+            "sent to a custom file upload page where they must upload the file themselves so it can be analyzed.\n\n"
+            " * step 1: reality_defender_generate_upload_url - Create a URL so the user can upload the file\n"
+            " * step 2: reality_defender_get_upload_info - Get the details of the upload after the user affirms upload\n"
+            " * step 3: reality_defender_validate_image_authenticity - Ask Reality Defender to analyze the file\n\n"
+            "### direct_download\n"
+            "The user has the URL to a file hosted externally. In this case, the file can be downloaded\n"
+            "directly to the filesystem and processed without any additional steps necessary by the user.\n\n"
+            " * step 1: reality_defender_validate_image_authenticity - Ask Reality Defender to analyze the file\n"
+            " * step 2: reality_defender_get_upload_info - Using the response from step 1, retrieve additional file metadata for final response to user.\n\n"
+            "Note: direct_download is preferred to user_upload as it's more convenient for the user, but user_upload works in more scenarios\n\n"
+            "## Error Handling\n\n"
+            "For ANY error returned by a tool:\n"
+            "* Explain the specific issue clearly to the user\n"
+            "* If the error is an HTTP failure, clearly explain why this could happen and indicate which host returned the error.\n"
+            "    * Note: 404 errors during file download could be due to authentication failure depending on how the server handles the request.\n"
+            "* Suggest using the user_upload workflow as an alternative to direct_download when it might work\n"
+            "* Be helpful and specific in your guidance\n\n"
+            "Always follow the appropriate sequence based on user input and error conditions.\n"
+        )
+    else:
+        return (
+            "# Reality Defender: MCP Server\n\n"
+            "## Detecting AI generated media\n"
+            "Uploads are disabled on this server. Use direct URL downloads only.\n\n"
+            "### direct_download\n"
+            "The user has the URL to a file hosted externally. In this case, the file can be downloaded\n"
+            "directly to the filesystem and processed without any additional steps necessary by the user.\n\n"
+            " * step 1: reality_defender_validate_image_authenticity - Ask Reality Defender to analyze the file\n"
+            " * step 2: reality_defender_get_upload_info - Using the response from step 1, retrieve additional file metadata for final response to user.\n\n"
+            "## Error Handling\n\n"
+            "For ANY error returned by a tool:\n"
+            "* Explain the specific issue clearly to the user\n"
+            "* If the error is an HTTP failure, clearly explain why this could happen and indicate which host returned the error.\n"
+            "* Be helpful and specific in your guidance\n\n"
+            "Always follow the appropriate sequence based on user input and error conditions.\n"
+        )
+
+
+_UPLOADS_ENABLED_DEFAULT = os.environ.get("UPLOADS", "true").strip().lower() not in (
+    "false",
+    "0",
+    "no",
+    "off",
+)
+
+
 mcp = FastMCP(
     "realitydefender",
     lifespan=app_lifespan,
-    instructions="""
-# Reality Defender: MCP Server
-
-## Detecting AI generated media
-For file analysis via Reality Defender, there are two flows: user uploaded and direct download.
-
-### user_upload
-A user indicates they have a file they would like to upload for analysis themselves. They might 
-have been sent a file or have already downloaded it from a web site. In this case, the user will need to be
-sent to a custom file upload page where they must upload the file themselves so it can be analyzed.
-
- * step 1: reality_defender_generate_upload_url - Create a URL so the user can upload the file
- * step 2: reality_defender_get_upload_info - Get the details of the upload after the user affirms upload
- * step 3: reality_defender_validate_image_authenticity - Ask Reality Defender to analyze the file
-
-### direct_download
-The user has the URL to a file hosted externally. In this case, the file can be downloaded
-directly to the filesystem and processed without any additional steps necessary by the user.
-
- * step 1: reality_defender_validate_image_authenticity - Ask Reality Defender to analyze the file
- * step 2: reality_defender_get_upload_info - Using the response from step 1, retrieve additional file metadata for final response to user.
-
-Note: direct_download is preferred to user_upload as it's more convenient for the user, but user_upload works in more scenarios
-
-## Error Handling
-
-For ANY error returned by a tool:
-* Explain the specific issue clearly to the user
-* If the error is an HTTP failure, clearly explain why this could happen and indicate which host returned the error.
-    * Note: 404 errors during file download could be due to authentication failure depending on how the server handles the request.
-* Suggest using the user_upload workflow as an alternative to direct_download when it might work
-* Be helpful and specific in your guidance
-
-Always follow the appropriate sequence based on user input and error conditions.
-""",
+    instructions=_build_instructions(_UPLOADS_ENABLED_DEFAULT),
     host=_MCP_HOST,
     port=_MCP_PORT,
     mount_path=_MCP_MOUNT_PATH,
@@ -302,10 +332,21 @@ async def reality_defender_generate_upload_url(
         A GenerateUploadUrlOutput object with information needed to direct the user
         to upload the image or an Error
     """
+    # Respect configuration: disable upload URL generation when uploads are disabled
+    if not ctx.request_context.lifespan_context.config.uploads_enabled:
+        return Error(
+            error=(
+                "File uploads are disabled on this server (UPLOADS=false). "
+                "Please provide a direct HTTPS URL to the image for analysis."
+            )
+        )
+
     web_server_url = ctx.request_context.lifespan_context.web_server_url
 
     try:
         request_id = str(uuid.uuid4())
+        if not web_server_url:
+            raise RuntimeError("Upload web server is not available")
         upload_url = f"{web_server_url}/upload/{request_id}"
 
         logger.info(f"Generated upload URL with request_id: {request_id}")
@@ -452,9 +493,15 @@ async def reality_defender_request_file_analysis(
 
         parsed_url = urlparse(request.file_url)
         if not parsed_url.scheme or not parsed_url.netloc:
-            return Error(
-                error="Invalid image URL format. The URL must include 'http://' or 'https://' and a valid domain. Please check the URL and try again, or upload the image directly using the upload workflow."
+            base_msg = (
+                "Invalid image URL format. The URL must include 'http://' or 'https://' and a valid domain. "
+                "Please check the URL and try again."
             )
+            if ctx.request_context.lifespan_context.config.uploads_enabled:
+                base_msg += (
+                    " Alternatively, you can upload the image using the upload workflow."
+                )
+            return Error(error=base_msg)
 
         with tempfile.NamedTemporaryFile(mode="wb") as temp_file:
             try:
