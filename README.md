@@ -46,7 +46,7 @@ To run the MCP server:
 uv run ./src/reality_defender_mcp_server/mcp_server.py
 ```
 
-The server will start with the web server component for file uploads on `localhost:8080`.
+By default, the server also starts a small web server for file uploads. You can disable uploads entirely by setting `UPLOADS=false`.
 
 To run MCP over Streamable HTTP (cloud-friendly):
 
@@ -106,6 +106,7 @@ The application uses environment variables for configuration:
 | `WEB_SERVER_HOST` | Host for the web server | No | 127.0.0.1 |
 | `WEB_SERVER_PORT` | Port for the web server | No | 8080 |
 | `WEB_SERVER_UPLOADS_DIR` | Directory for file uploads | No | ./uploads |
+| `UPLOADS` | Enable local file upload workflow; set to `false` to disable uploads and only allow remote URLs | No | true |
 
 ### API Key Authentication
 
@@ -218,6 +219,8 @@ pytest
 - `GET /upload/{uuid}` - Upload form for specified UUID
 - `POST /upload/{uuid}` - File upload endpoint
 - `GET /docs` - OpenAPI documentation
+
+Note: If `UPLOADS=false`, the upload web server is not started and only direct URL analysis is supported. The tools and responses will not suggest uploading files when uploads are disabled.
 
 ### Response Types
 
