@@ -100,8 +100,12 @@ class RealityDefenderClientHarness:
         self.api_key = reality_defender_api_key
         self.client = None
 
-    def get_client(self, api_key_override: str | None = None) -> RealityDefender | Error:
-        resolved_api_key = api_key_override.strip() if api_key_override else self.api_key
+    def get_client(
+        self, api_key_override: str | None = None
+    ) -> RealityDefender | Error:
+        resolved_api_key = (
+            api_key_override.strip() if api_key_override else self.api_key
+        )
 
         if not resolved_api_key:
             return Error(
@@ -207,7 +211,12 @@ async def app_lifespan(_: FastMCP) -> AsyncIterator[AppContext]:
 
     if not config.uploads_enabled:
         logger.info("Removing upload tool from available tools")
-        mcp.remove_tool("reality_defender_generate_upload_url")
+        upload_tool_name = "reality_defender_generate_upload_url"
+        if upload_tool_name in mcp._tool_manager._tools:
+            mcp.remove_tool(upload_tool_name)
+            logger.info("Upload tool removed successfully")
+        else:
+            logger.debug("Upload tool already removed or not registered")
 
     try:
         yield AppContext(
@@ -448,10 +457,14 @@ async def reality_defender_request_file_analysis(
 
     request_api_key = get_request_api_key(ctx)
     if request_api_key:
-        logger.info("Using request-scoped Reality Defender API key from X-Api-Key header")
+        logger.info(
+            "Using request-scoped Reality Defender API key from X-Api-Key header"
+        )
 
-    reality_defender_result = ctx.request_context.lifespan_context.reality_defender.get_client(
-        api_key_override=request_api_key
+    reality_defender_result = (
+        ctx.request_context.lifespan_context.reality_defender.get_client(
+            api_key_override=request_api_key
+        )
     )
     if isinstance(reality_defender_result, Error):
         logger.error(
@@ -493,9 +506,7 @@ async def reality_defender_request_file_analysis(
                 "Please check the URL and try again."
             )
             if ctx.request_context.lifespan_context.config.uploads_enabled:
-                base_msg += (
-                    " Alternatively, you can upload the image using the upload workflow."
-                )
+                base_msg += " Alternatively, you can upload the image using the upload workflow."
             return Error(error=base_msg)
 
         with tempfile.NamedTemporaryFile(mode="wb") as temp_file:
