@@ -205,6 +205,10 @@ async def app_lifespan(_: FastMCP) -> AsyncIterator[AppContext]:
 
     logger.info("MCP server initialization complete")
 
+    if not config.uploads_enabled:
+        logger.info("Removing upload tool from available tools")
+        mcp.remove_tool("reality_defender_generate_upload_url")
+
     try:
         yield AppContext(
             config=config,
@@ -332,15 +336,6 @@ async def reality_defender_generate_upload_url(
         A GenerateUploadUrlOutput object with information needed to direct the user
         to upload the image or an Error
     """
-    # Respect configuration: disable upload URL generation when uploads are disabled
-    if not ctx.request_context.lifespan_context.config.uploads_enabled:
-        return Error(
-            error=(
-                "File uploads are disabled on this server (UPLOADS=false). "
-                "Please provide a direct HTTPS URL to the image for analysis."
-            )
-        )
-
     web_server_url = ctx.request_context.lifespan_context.web_server_url
 
     try:
